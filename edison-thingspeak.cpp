@@ -11,14 +11,14 @@
 #include <iostream>
 
 /*
- * Description: An Intel Edison project, where we, simply, post data from various sensors to a ThingsSpeak channel every 15 seconds
+ * Description: An Intel Edison project, where we, simply, post data from various sensors to a ThingsSpeak channel every 15 seconds.
  *
  *
  * Hardware: 1 x Gravity - Analog LM35 Temperature Sensor
- * 		`	 1 x Gravity - Analog Ambient Light Sensor
- * 		     1 x HIH4030 Humidity Sensor
- * 		     1 x BMP180 Barometer Module
- *			 Resting on a Gravity - GPIO Shield
+ *           1 x Gravity - Analog Ambient Light Sensor
+ *           1 x HIH4030 Humidity Sensor
+ *           1 x BMP180 Barometer Module
+ *           Resting on a Gravity - GPIO Shield
  *
  * Additional linker flags: upm-bmpx8x upm-lm35 curl
  */
@@ -47,7 +47,7 @@ upm::LM35 *aio_LM35;
 // Not really necessary since there is no exit mechanism, but there may be in the future.
 bool APP_RUNNING = true;
 // Voltage value for calculating relative humidity.
-float supply_voltage = 5.0;
+float supply_voltage = 5;
 
 // ------------ Global functions -----------------
 float getTemperature();
@@ -152,9 +152,10 @@ int main()
 
 float getTemperature()
 {
-	float current_value = aio_LM35->getTemperature();
-	int rounded_value = round(current_value);
-	std::cout << "Temperature: " << rounded_value << std::endl;
+	float raw_value = aio_LM35->getTemperature();
+	float  calibrated_value = raw_value * 5.0/10.24;
+	int rounded_value = round(calibrated_value);
+	std::cout << "\nTemperature: " << rounded_value << std::endl;
 
 	return rounded_value;
 }
@@ -162,11 +163,16 @@ float getTemperature()
 int getHumidity(int temp)
 {
 	int current_value = aio_HIH4030->read();
+	std::cout << "Read value: " << current_value << std::endl;
+	float voltage = supply_voltage*(0.0062*current_value + 0.16); // convert to voltage value
+	std::cout << "Voltage: " << voltage << "V" << std::endl;
 	// The following calculations derive from the HIH-4030 datasheet.
-	float voltage = current_value/1023. * supply_voltage; // convert to voltage value
-	float sensorRH = 161.0 * voltage / supply_voltage - 25.8;
-	float trueRH = sensorRH / (1.0546 - 0.00216 * temp); //temperature adjustment
-	std::cout << "Humidity: " << trueRH << std::endl;
+	float sensorRH =  (voltage - 0.958)/0.0307;
+	std::cout << "sensorRH: " << sensorRH << "%" << std::endl;
+	float trueRH = sensorRH / (1.0546 - (0.00216 * temp)); //temperature adjustment
+	// Trim to two digits.
+	trueRH = round(trueRH * 100.) / 100.;
+	std::cout << "trueRH: " << trueRH  << "%"<< std::endl;
 
 	return trueRH;
 }
@@ -186,7 +192,6 @@ int getLightLevel()
 
 	return current_value;
 }
-
 
 
 
